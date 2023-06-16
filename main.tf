@@ -4,53 +4,29 @@ provider "aws" {
 }
 
 # Create a VPC
-resource "aws_vpc" "dev" {
-  cidr_block = "10.0.0.0/16"
-
+resource "aws_vpc" "myapp-vpc" {
+  cidr_block = var.vpc_cidr_block 
   tags = {
-    Name = "Development_VPC"
+    Name = "${var.env_prefix}-vpc"
   }
 }
 
-# Variable for Subnet
-
-variable "subnet_cidr_block" {
-  description = "subnet_cidr_block"
+module "myapp-subnet" {
+  source = "./modules/subnet"
+  availability_zone = var.availability_zone
+  env_prefix = var.env_prefix
+  subnet_cidr_block = var.subnet_cidr_block
+  vpc_id = aws_vpc.myapp-vpc.id
 }
 
-variable "subnet_tag" {
-  description = "subnet_tag"
-}
-
-# Create a Subnet
-resource "aws_subnet" "dev_subnet" {
-  vpc_id     = aws_vpc.dev.id
-  cidr_block = var.subnet_cidr_block
-  availability_zone = "us-west-2a"
-
-  tags = {
-    Name = var.subnet_tag
-  }
-}
-
-data "aws_vpc" "selected" {
-  default = true
-}
-
-resource "aws_subnet" "stage" {
-  vpc_id            = data.aws_vpc.selected.id
-  availability_zone = "us-west-2b"
-  cidr_block        = cidrsubnet(data.aws_vpc.selected.cidr_block, 2, 1)
-}
-
-output "vpc_id" {
-  value = aws_vpc.dev.id
-}
-
-output "subnet_id" {
-  value = aws_subnet.dev_subnet.id
-}
-
-output "vpc_main_route_table_id" {
-  value = aws_vpc.dev.main_route_table_id
+module "myapp-server" {
+  source = "./modules/webserver"
+  vpc_id = aws_vpc.myapp-vpc.id
+  subnet_cidr_block = var.subnet_cidr_block
+  env_prefix = var.env_prefix
+  availability_zone = var.availability_zone
+  my_IP = var.my_IP
+  pub_key = var.pub_key
+  instance_type = var.instance_type
+  subnet = module.myapp-subnet.subnet
 }
